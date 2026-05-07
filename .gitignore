@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+examples/past_script
+eval_by_question_results/*.parquet
