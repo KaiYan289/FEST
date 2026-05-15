@@ -5,7 +5,7 @@
 
 This is the code repository for the paper "Boosting Reinforcement Learning with Verifiable Rewards via Randomly Selected Few-Shot Guidance", a work that aims to squeeze performance gain for RLVR using only minimal amount of  SFT data. The codebase is built on the basis of [ReLIFT](https://github.com/TheRoadQaQ/ReLIFT/tree/main), and integrate implementation for [HPT](https://github.com/TheRoadQaQ/ReLIFT/dataset), [LUFFY](https://github.com/ElliottYan/LUFFY) and [CHORD-φ](https://github.com/agentscope-ai/Trinity-RFT/tree/main/examples/mix_chord). 
 
-- 📜 [Paper (arXiv)] To be updated soon. Stay tuned!
+- 📜 [Paper (arXiv)](https://arxiv.org/abs/2605.15012)
 
 - 🤗 [HuggingFace Collection](https://huggingface.co/collections/kaiyan289/fest)
 
