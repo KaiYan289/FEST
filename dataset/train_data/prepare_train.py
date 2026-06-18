@@ -1,14 +1,7 @@
-#from datasets import load_dataset
-import pandas as pd
+from datasets import load_dataset
 
 dataset = load_dataset("Elliott/Openr1-Math-46k-8192", split="train")
 
-# print(dataset[0])
+dataset = dataset.map(lambda example: {"prompt": example["prompt"][1:]})
 
-items = []
-
-for i in range(len(dataset)):
-    items.append(dataset['prompt'][i][1:])
-
-dataset['prompt'] = items
 dataset.to_parquet("openr1_hpt.parquet")
