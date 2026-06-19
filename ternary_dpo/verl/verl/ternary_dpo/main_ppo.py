@@ -59,10 +59,17 @@ def run_ppo(config) -> None:
         # AF_UNIX socket paths must be <107 bytes; lustre TMPDIR is too long.
         os.environ.setdefault("RAY_TMPDIR", f"/tmp/ray-{os.environ.get('USER', 'user')}")
         os.makedirs(os.environ["RAY_TMPDIR"], exist_ok=True)
-        # this is for local ray cluster
-        # "RAY_DEBUG": "1",
+        os.environ.setdefault("RAY_OBJECT_STORE_ALLOW_SLOW_STORAGE", "1")
+
+        num_cpus = config.ray_init.get("num_cpus", None)
+        if num_cpus is None and os.environ.get("SLURM_CPUS_PER_TASK"):
+            num_cpus = int(os.environ["SLURM_CPUS_PER_TASK"])
+
         ray.init(
             runtime_env={"env_vars": {"TOKENIZERS_PARALLELISM": "true", "NCCL_DEBUG": "WARN", "VLLM_LOGGING_LEVEL": "WARN", "VLLM_ALLOW_RUNTIME_LORA_UPDATING": "true"}},
+            num_cpus=num_cpus,
+            _temp_dir=os.environ["RAY_TMPDIR"],
+            object_store_memory=int(os.environ.get("RAY_OBJECT_STORE_MEMORY", "10000000000")),
         )
 
     runner = TaskRunner.remote()
