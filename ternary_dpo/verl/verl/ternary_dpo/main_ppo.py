@@ -17,6 +17,7 @@ Note that we don't combine the main with ray_trainer as ray_trainer is used by o
 
 import hydra
 import ray
+import os
 import subprocess
 import multiprocessing
 from pathlib import Path
@@ -55,6 +56,9 @@ def run_ppo(config) -> None:
     runtime = datetime.now().strftime("%d-%m-%Y %H:%M:%S")
     check_modification(runtime + "_" + config.trainer.experiment_name)
     if not ray.is_initialized():
+        # AF_UNIX socket paths must be <107 bytes; lustre TMPDIR is too long.
+        os.environ.setdefault("RAY_TMPDIR", f"/tmp/ray-{os.environ.get('USER', 'user')}")
+        os.makedirs(os.environ["RAY_TMPDIR"], exist_ok=True)
         # this is for local ray cluster
         # "RAY_DEBUG": "1",
         ray.init(
