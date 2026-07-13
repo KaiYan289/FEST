@@ -749,19 +749,21 @@ class TernaryDPOTrainer(RayPPOTrainer):
         #exit(0)
         ##################################################
         
-        gold_epoch = 0
-        gold_iter = iter(self.gold_dataloader) # note: this is now not saved and will be reset upon loading and continuing a job. But we assume this dataset is very small so it does not matter. A new epoch will be started very soon anyway.
+        # _load_checkpoint restores this value and the StatefulDataLoader
+        # position when gold_data.pt is present.
+        self.gold_epoch = getattr(self, "gold_epoch", 0)
+        gold_iter = iter(self.gold_dataloader)
 
         for epoch in range(self.config.trainer.total_epochs):
             for batch_dict in self.train_dataloader:
                 try:
                     gold_dict = next(gold_iter)
                 except StopIteration:
-                    gold_epoch += 1
+                    self.gold_epoch += 1
                     gold_iter = iter(self.gold_dataloader)
                     gold_dict = next(gold_iter)
 
-                metrics = {"gold_epoch": gold_epoch}
+                metrics = {"gold_epoch": self.gold_epoch}
                 timing_raw = {}
                 rl_batch: DataProto = DataProto.from_single_dict(batch_dict)
                 gold_batch: DataProto = DataProto.from_single_dict(gold_dict)

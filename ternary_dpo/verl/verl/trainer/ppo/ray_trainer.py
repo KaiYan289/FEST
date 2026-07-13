@@ -873,6 +873,17 @@ class RayPPOTrainer:
         dataloader_state_dict = self.train_dataloader.state_dict()
         torch.save(dataloader_state_dict, dataloader_local_path)
 
+        # TernaryDPOTrainer has a second, independently sampled gold loader.
+        # Persist both its sampler position and epoch counter so resumes do not
+        # replay gold samples from the beginning.
+        if hasattr(self, "gold_dataloader"):
+            gold_dataloader_local_path = os.path.join(local_global_step_folder, "gold_data.pt")
+            gold_dataloader_checkpoint = {
+                "dataloader_state_dict": self.gold_dataloader.state_dict(),
+                "epoch": getattr(self, "gold_epoch", 0),
+            }
+            torch.save(gold_dataloader_checkpoint, gold_dataloader_local_path)
+
         # latest checkpointed iteration tracker (for atomic usage)
         local_latest_checkpointed_iteration = os.path.join(self.config.trainer.default_local_dir, "latest_checkpointed_iteration.txt")
         with open(local_latest_checkpointed_iteration, "w") as f:
@@ -928,6 +939,15 @@ class RayPPOTrainer:
             self.train_dataloader.load_state_dict(dataloader_state_dict)
         else:
             print(f"Warning: No dataloader state found at {dataloader_local_path}, will start from scratch")
+
+        if hasattr(self, "gold_dataloader"):
+            gold_dataloader_local_path = os.path.join(global_step_folder, "gold_data.pt")
+            if os.path.exists(gold_dataloader_local_path):
+                gold_dataloader_checkpoint = torch.load(gold_dataloader_local_path, weights_only=False)
+                self.gold_dataloader.load_state_dict(gold_dataloader_checkpoint["dataloader_state_dict"])
+                self.gold_epoch = int(gold_dataloader_checkpoint.get("epoch", 0))
+            else:
+                print(f"Warning: No gold dataloader state found at {gold_dataloader_local_path}, will start gold data from scratch")
 
     def _balance_batch(self, batch: DataProto, metrics, logging_prefix="global_seqlen"):
         """Reorder the data on single controller such that each dp rank gets similar total tokens"""
