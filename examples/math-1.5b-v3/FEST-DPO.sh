@@ -1,29 +1,49 @@
+#!/usr/bin/env bash
+set -euo pipefail
 set -x
 
-# Set XFormers backend to avoid CUDA errors
-# export VLLM_ATTENTION_BACKEND=XFORMERS
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FEST_ROOT="${FEST_ROOT:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
+cd "${FEST_ROOT}"
+
+export VLLM_ATTENTION_BACKEND=XFORMERS
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+export RAY_TMPDIR="${RAY_TMPDIR:-/tmp/ray-${USER}}"
+export RAY_OBJECT_STORE_ALLOW_SLOW_STORAGE=1
+export RAY_OBJECT_STORE_MEMORY="${RAY_OBJECT_STORE_MEMORY:-10000000000}"
+RAY_CPUS="${SLURM_CPUS_PER_TASK:-64}"
 unset ROCR_VISIBLE_DEVICES
-export WANDB_ENTITY=xxxxxxx
-export WANDB_API_KEY=xxxxxxx
-ray stop 
-ray start --head --num-cpus=50
+export WANDB_ENTITY=kaiyan3
+export WANDB_API_KEY=0ff1d09826eebb1384c64d74b0990f585b5b0240
+ray stop --force || true
 
 export DATA_DIR=./dataset
 export MAX_RESPONSE_LENGTH=8192
 export MAX_BATCHED_TOKENS=32768
 
-export MODEL_PATH="/work/hdd/bbsg/kaiyan289/Qwen2.5-Math-1.5B"
+USER_ROOT="${USER_ROOT:-/lustre/fsw/portfolios/av/projects/av_alpamayo_reasoning/users/${USER}}"
+export MODEL_PATH="${FEST_MODEL_PATH:-${USER_ROOT}/Qwen2.5-Math-1.5B}"
+export FEST_SEED="${FEST_SEED:-1}"
 export WANDB_INIT_TIMEOUT=300
-export EXP_NAME=fest-dpo_gw0.01_wl0.01_gl0.1
-export WANDB_CACHE_DIR=/work/hdd/bbsg/kaiyan289/wandb_cache
-export WANDB_CONFIG_DIR=/work/hdd/bbsg/kaiyan289/wandb_config
-export XDG_CACHE_HOME=/work/hdd/bbsg/kaiyan289/xdg_cache
-export XDG_CONFIG_HOME=/work/hdd/bbsg/kaiyan289/xdg_config
-mkdir -p "$WANDB_DIR" "$WANDB_CACHE_DIR" "$WANDB_CONFIG_DIR"
 export WANDB_PROJECT="relift"
+export EXP_NAME="${FEST_EXP_NAME:-fest-dpo_gw0.01_wl0.01_gl0.1_seed${FEST_SEED}}"
+export WANDB_CACHE_DIR="${USER_ROOT}/wandb_cache"
+export WANDB_CONFIG_DIR="${USER_ROOT}/wandb_config"
+export XDG_CACHE_HOME="${USER_ROOT}/xdg_cache"
+export XDG_CONFIG_HOME="${USER_ROOT}/xdg_config"
+export WANDB_DIR="${USER_ROOT}/wandb_runs"
+mkdir -p "$RAY_TMPDIR" "$WANDB_DIR" "$WANDB_CACHE_DIR" "$WANDB_CONFIG_DIR" "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME"
+
+CKPT_DIR="./train_results/${WANDB_PROJECT}/${EXP_NAME}"
+# shellcheck source=_fest_1p5b_common.sh
+source "${SCRIPT_DIR}/_fest_1p5b_common.sh"
+fest_prepare_resume_checkpoint "${CKPT_DIR}"
 
 # the actor_rollout_ref.actor.sft are not used except for ReLIFT
 python -u -m verl.ternary_dpo.main_ppo \
+    ray_init.num_cpus="${RAY_CPUS}" \
+    +data.seed="${FEST_SEED}" \
+    +actor_rollout_ref.rollout.seed="${FEST_SEED}" \
     trainer.soft_update_factor=0.05 \
     +actor_rollout_ref.actor.sft.sft_loss_type="v0" \
     +actor_rollout_ref.actor.beta_gold_to_win=0.01 \
@@ -74,7 +94,7 @@ python -u -m verl.ternary_dpo.main_ppo \
     +trainer.special_mode="v3_nogoldrl" \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=64 \
-    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=4 \
+    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=32 \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
     actor_rollout_ref.actor.ppo_max_token_len_per_gpu=$MAX_BATCHED_TOKENS \
     actor_rollout_ref.actor.kl_loss_coef=0.00 \
@@ -115,15 +135,18 @@ python -u -m verl.ternary_dpo.main_ppo \
     trainer.project_name="$WANDB_PROJECT" \
     trainer.experiment_name="$EXP_NAME" \
     trainer.val_before_train=False \
-    trainer.n_gpus_per_node=2 \
+    trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     +trainer.update_ref_freq=-2 \
-    trainer.save_freq=50 \
+    trainer.save_freq=4 \
+    trainer.max_actor_ckpt_to_keep=2 \
+    trainer.max_critic_ckpt_to_keep=2 \
     trainer.test_freq=10 \
     algorithm.norm_adv_by_std_in_grpo=False \
     data.shuffle=True \
     trainer.default_hdfs_dir=null \
     trainer.rollout_data_dir=./rollout_data/${EXP_NAME} \
     trainer.default_local_dir=./train_results/${WANDB_PROJECT}/${EXP_NAME} \
-    trainer.total_epochs=2
+    trainer.total_epochs=2 \
+    "${RESUME_ARGS[@]}"
 
