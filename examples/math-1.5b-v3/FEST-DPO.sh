@@ -38,6 +38,7 @@ CKPT_DIR="./train_results/${WANDB_PROJECT}/${EXP_NAME}"
 # shellcheck source=_fest_1p5b_common.sh
 source "${SCRIPT_DIR}/_fest_1p5b_common.sh"
 fest_prepare_resume_checkpoint "${CKPT_DIR}"
+fest_prepare_wandb_resume "${CKPT_DIR}" "${EXP_NAME}"
 
 # the actor_rollout_ref.actor.sft are not used except for ReLIFT
 python -u -m verl.ternary_dpo.main_ppo \
