@@ -139,8 +139,6 @@ python -u -m verl.ternary_dpo.main_ppo \
     trainer.nnodes=1 \
     +trainer.update_ref_freq=-2 \
     trainer.save_freq=4 \
-    trainer.max_actor_ckpt_to_keep=2 \
-    trainer.max_critic_ckpt_to_keep=2 \
     trainer.test_freq=10 \
     algorithm.norm_adv_by_std_in_grpo=False \
     data.shuffle=True \
