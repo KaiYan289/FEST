@@ -95,7 +95,7 @@ python -u -m verl.ternary_dpo.main_ppo \
     +trainer.special_mode="v3_nogoldrl" \
     actor_rollout_ref.model.enable_gradient_checkpointing=True \
     actor_rollout_ref.actor.ppo_mini_batch_size=64 \
-    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=8 \
+    actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu=4 \
     actor_rollout_ref.actor.use_dynamic_bsz=True \
     actor_rollout_ref.actor.ppo_max_token_len_per_gpu=$MAX_BATCHED_TOKENS \
     actor_rollout_ref.actor.kl_loss_coef=0.00 \
