@@ -36,6 +36,10 @@ mkdir -p "$RAY_TMPDIR" "$WANDB_DIR" "$WANDB_CACHE_DIR" "$WANDB_CONFIG_DIR" "$XDG
 export WANDB_PROJECT="relift"
 
 CKPT_DIR="./train_results/${WANDB_PROJECT}/${EXP_NAME}"
+# shellcheck source=_fest_1p5b_common.sh
+source "${SCRIPT_DIR}/_fest_1p5b_common.sh"
+fest_prepare_wandb_resume "${CKPT_DIR}" "${EXP_NAME}"
+
 RESUME_CKPT="${FEST_INIT_CKPT}"
 latest_step=-1
 for candidate in "${CKPT_DIR}"/global_step_*; do
