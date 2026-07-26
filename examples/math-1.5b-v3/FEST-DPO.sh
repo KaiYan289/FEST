@@ -27,6 +27,7 @@ export FEST_SEED="${FEST_SEED:-1}"
 export WANDB_INIT_TIMEOUT=300
 export WANDB_PROJECT="relift"
 export EXP_NAME="${FEST_EXP_NAME:-fest-dpo_gw0.01_wl0.01_gl0.1_seed${FEST_SEED}}"
+export GOLD_FILES="${FEST_GOLD_FILES:-${DATA_DIR}/train_data/openr1_128_shot_sample_1_hpt_format.parquet}"
 export WANDB_CACHE_DIR="${USER_ROOT}/wandb_cache"
 export WANDB_CONFIG_DIR="${USER_ROOT}/wandb_config"
 export XDG_CACHE_HOME="${USER_ROOT}/xdg_cache"
@@ -69,7 +70,7 @@ python -u -m verl.ternary_dpo.main_ppo \
     actor_rollout_ref.actor.optim.sft.lr=1e-6 \
     actor_rollout_ref.actor.optim.lr_warmup_steps=0 \
     algorithm.adv_estimator=grpo \
-    +data.gold_files=$DATA_DIR/train_data/openr1_128_shot_sample_1_hpt_format.parquet \
+    +data.gold_files="${GOLD_FILES}" \
     data.train_files=$DATA_DIR/train_data/openr1_hpt.parquet \
     data.val_files=$DATA_DIR/valid_hpt.parquet \
     data.truncation='left' \
