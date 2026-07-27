@@ -6,7 +6,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FEST_ROOT="${FEST_ROOT:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
 cd "${FEST_ROOT}"
 
-export VLLM_ATTENTION_BACKEND=XFORMERS
+if [[ "${FEST_DISABLE_XFORMERS:-0}" == "1" ]]; then
+    unset VLLM_ATTENTION_BACKEND
+else
+    export VLLM_ATTENTION_BACKEND=XFORMERS
+fi
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 export RAY_TMPDIR="${RAY_TMPDIR:-/tmp/ray-${USER}}"
 export RAY_OBJECT_STORE_ALLOW_SLOW_STORAGE=1
