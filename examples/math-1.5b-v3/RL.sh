@@ -148,7 +148,7 @@ python -u -m verl.ternary_dpo.main_ppo \
     trainer.n_gpus_per_node=8 \
     trainer.nnodes=1 \
     +trainer.update_ref_freq=-2 \
-    trainer.save_freq=50 \
+    trainer.save_freq=10 \
     trainer.test_freq=10 \
     algorithm.norm_adv_by_std_in_grpo=False \
     data.shuffle=True \
