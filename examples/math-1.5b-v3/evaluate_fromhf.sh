@@ -32,8 +32,7 @@ else
     unset VLLM_ATTENTION_BACKEND
 fi
 unset ROCR_VISIBLE_DEVICES
-ray stop || true
-ray start --head --num-cpus="${RAY_CPUS:-${SLURM_CPUS_PER_TASK:-50}}"
+ray stop --force || true
 
 export DATA_DIR=./dataset
 export WANDB_INIT_TIMEOUT=300
@@ -49,8 +48,8 @@ mkdir -p "$WANDB_DIR" "$WANDB_CACHE_DIR" "$WANDB_CONFIG_DIR" "$XDG_CACHE_HOME" "
     eval_by_question_results
 export WANDB_PROJECT="relift"
 SAVE_DATA_NAME="${FEST_EVAL_SAVE_DATA_NAME:-${EXP_NAME}}"
-EVAL_GPUS="${EVAL_GPUS:-2}"
-EVAL_TP_SIZE="${EVAL_TP_SIZE:-2}"
+EVAL_GPUS="${EVAL_GPUS:-8}"
+EVAL_TP_SIZE="${EVAL_TP_SIZE:-1}"
 python -u -m verl.ternary_dpo.main_ppo \
     +trainer.save_data_name="${SAVE_DATA_NAME}" \
     trainer.soft_update_factor=0.05 \
