@@ -1,28 +1,58 @@
+#!/usr/bin/env bash
+# Evaluate a HuggingFace-format checkpoint, including any train_results/*/best/actor.
+#
+# Usage:
+#   bash examples/math-1.5b-v3/evaluate_fromhf.sh <MODEL_PATH> <EXP_NAME>
+#
+# Example:
+#   bash examples/math-1.5b-v3/evaluate_fromhf.sh \
+#     train_results/relift/<run>/best/actor <run>-best
+set -euo pipefail
 set -x
 
-# Set XFormers backend to avoid CUDA errors
-# export VLLM_ATTENTION_BACKEND=XFORMERS
-unset ROCR_VISIBLE_DEVICES
-export WANDB_ENTITY=xxxxxxx
-export WANDB_API_KEY=xxxxxxx
-ray stop 
-ray start --head --num-cpus=50
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FEST_ROOT="${FEST_ROOT:-$(cd "${SCRIPT_DIR}/../.." && pwd)}"
+cd "${FEST_ROOT}"
 
-export MODEL_PATH="/work/hdd/bbsg/kaiyan289/SRFT-Qwen2.5-Math-1.5B"
+MODEL_PATH="${1:-${MODEL_PATH:-}}"
+EXP_NAME="${2:-${EXP_NAME:-}}"
+[[ -n "${MODEL_PATH}" && -n "${EXP_NAME}" ]] || {
+    echo "Usage: $0 <MODEL_PATH> <EXP_NAME>" >&2
+    exit 2
+}
+[[ -f "${MODEL_PATH}/config.json" ]] || {
+    echo "ERROR: MODEL_PATH must be a HuggingFace checkpoint directory: ${MODEL_PATH}" >&2
+    exit 1
+}
+
+# Keep the historical no-XFormers default. Set FEST_ENABLE_XFORMERS=1 when needed.
+if [[ "${FEST_ENABLE_XFORMERS:-0}" == "1" ]]; then
+    export VLLM_ATTENTION_BACKEND=XFORMERS
+else
+    unset VLLM_ATTENTION_BACKEND
+fi
+unset ROCR_VISIBLE_DEVICES
+ray stop || true
+ray start --head --num-cpus="${RAY_CPUS:-${SLURM_CPUS_PER_TASK:-50}}"
+
 export DATA_DIR=./dataset
 export WANDB_INIT_TIMEOUT=300
 export MAX_RESPONSE_LENGTH=8192
 export MAX_BATCHED_TOKENS=32768
-export EXP_NAME=SRFT-main
-export WANDB_DIR=/work/hdd/bbsg/kaiyan289/wandb_runs
-export WANDB_CACHE_DIR=/work/hdd/bbsg/kaiyan289/wandb_cache
-export WANDB_CONFIG_DIR=/work/hdd/bbsg/kaiyan289/wandb_config
-export XDG_CACHE_HOME=/work/hdd/bbsg/kaiyan289/xdg_cache
-export XDG_CONFIG_HOME=/work/hdd/bbsg/kaiyan289/xdg_config
-mkdir -p "$WANDB_DIR" "$WANDB_CACHE_DIR" "$WANDB_CONFIG_DIR"
+USER_ROOT="${USER_ROOT:-/lustre/fsw/portfolios/av/projects/av_alpamayo_reasoning/users/${USER}}"
+export WANDB_DIR="${WANDB_DIR:-${USER_ROOT}/wandb_runs}"
+export WANDB_CACHE_DIR="${WANDB_CACHE_DIR:-${USER_ROOT}/wandb_cache}"
+export WANDB_CONFIG_DIR="${WANDB_CONFIG_DIR:-${USER_ROOT}/wandb_config}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-${USER_ROOT}/xdg_cache}"
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-${USER_ROOT}/xdg_config}"
+mkdir -p "$WANDB_DIR" "$WANDB_CACHE_DIR" "$WANDB_CONFIG_DIR" "$XDG_CACHE_HOME" "$XDG_CONFIG_HOME" \
+    eval_by_question_results
 export WANDB_PROJECT="relift"
+SAVE_DATA_NAME="${FEST_EVAL_SAVE_DATA_NAME:-${EXP_NAME}}"
+EVAL_GPUS="${EVAL_GPUS:-2}"
+EVAL_TP_SIZE="${EVAL_TP_SIZE:-2}"
 python -u -m verl.ternary_dpo.main_ppo \
-    +trainer.save_data_name="SRFT-main" \
+    +trainer.save_data_name="${SAVE_DATA_NAME}" \
     trainer.soft_update_factor=0.05 \
     +actor_rollout_ref.actor.sft.sft_loss_type="v0" \
     +actor_rollout_ref.actor.beta_gold_to_win=0.1 \
@@ -79,7 +109,7 @@ python -u -m verl.ternary_dpo.main_ppo \
     actor_rollout_ref.actor.fsdp_config.sft_param_offload=False \
     actor_rollout_ref.actor.fsdp_config.sft_optimizer_offload=True \
     +actor_rollout_ref.actor.fsdp_config.sft_use_lora=False \
-    actor_rollout_ref.rollout.tensor_model_parallel_size=2 \
+    actor_rollout_ref.rollout.tensor_model_parallel_size="${EVAL_TP_SIZE}" \
     actor_rollout_ref.rollout.name=vllm \
     actor_rollout_ref.rollout.max_num_batched_tokens=$MAX_BATCHED_TOKENS \
     actor_rollout_ref.rollout.disable_log_stats=False \
@@ -102,7 +132,7 @@ python -u -m verl.ternary_dpo.main_ppo \
     trainer.project_name="$WANDB_PROJECT" \
     trainer.experiment_name="$EXP_NAME" \
     trainer.val_before_train=True \
-    trainer.n_gpus_per_node=2 \
+    trainer.n_gpus_per_node="${EVAL_GPUS}" \
     trainer.nnodes=1 \
     +trainer.update_ref_freq=-1 \
     trainer.save_freq=-1 \
